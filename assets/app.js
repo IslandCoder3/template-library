@@ -1,5 +1,5 @@
 (function () {
-	var templates = window.TL_TEMPLATES || [];
+	var templates = [];
 	var $ = function (sel) { return document.querySelector(sel); };
 	var els = { list: $('#tl_list'), cats: $('#tl_cats'), search: $('#tl_search'), count: $('#tl_count'), main: $('#tl_main') };
 	var state = { q: '', cat: 'All', slug: null, tab: 'full', viewport: 'desktop', code: {} };
@@ -91,6 +91,80 @@
 		return hlHTML(code);
 	}
 
+	/* ---------- split one HTML file into markup / CSS / JS ---------- */
+	function dedent(s) {
+		s = s.replace(/\r\n/g, '\n').replace(/^\n+|\n+$/g, '');
+		var lines = s.split('\n'), min = null;
+		lines.forEach(function (l) {
+			if (!l.trim()) return;
+			var n = l.match(/^[ \t]*/)[0].length;
+			min = min === null ? n : Math.min(min, n);
+		});
+		if (!min) return s.replace(/\s+$/, '');
+		return lines.map(function (l) { return l.slice(min); }).join('\n').replace(/\s+$/, '');
+	}
+
+	function parseHTML(raw) {
+		raw = raw.replace(/\r\n/g, '\n');
+		var css = [], js = [], m, re;
+		re = /<style\b[^>]*>([\s\S]*?)<\/style>/gi;
+		while ((m = re.exec(raw))) if (m[1].trim()) css.push(dedent(m[1]));
+		var inlineScript = /<script\b(?![^>]*\bsrc\s*=)[^>]*>([\s\S]*?)<\/script>/gi;
+		while ((m = inlineScript.exec(raw))) if (m[1].trim()) js.push(dedent(m[1]));
+
+		var bm = raw.match(/<body\b[^>]*>([\s\S]*)<\/body>/i), body;
+		if (bm) body = bm[1];
+		else body = raw.replace(/<head\b[^>]*>[\s\S]*?<\/head>/i, '').replace(/<!DOCTYPE[^>]*>|<\/?html\b[^>]*>/gi, '');
+		body = body.replace(inlineScript, '').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '');
+		return { full: raw, html: dedent(body).replace(/\n{3,}/g, '\n\n'), css: css.join('\n\n'), js: js.join('\n\n') };
+	}
+
+	function encodePath(p) { return p.split('/').map(encodeURIComponent).join('/'); }
+
+	function normalize(t) {
+		var entry = t.entry || (t.slug + '.html');
+		return {
+			slug: t.slug,
+			title: t.title || t.slug,
+			category: t.category || 'General',
+			description: t.description || '',
+			tags: t.tags || [],
+			entry: entry,
+			url: 'templates/' + encodeURIComponent(t.slug) + '/' + encodePath(entry),
+			files: (t.files && t.files.length) ? t.files : [entry]
+		};
+	}
+
+	/* ---------- zip download (runs in the browser) ---------- */
+	function downloadZip(t, btn) {
+		if (!window.JSZip) { alert('The zip library could not be loaded. Check your internet connection and try again.'); return; }
+		var label = btn.textContent;
+		btn.textContent = 'Preparing…';
+		btn.disabled = true;
+		var zip = new JSZip();
+		Promise.all(t.files.map(function (path) {
+			return fetch('templates/' + encodeURIComponent(t.slug) + '/' + encodePath(path), { cache: 'no-store' }).then(function (r) {
+				if (!r.ok) throw new Error('Missing file: ' + path);
+				return r.arrayBuffer();
+			}).then(function (buf) { zip.file(path, buf); });
+		})).then(function () {
+			return zip.generateAsync({ type: 'blob' });
+		}).then(function (blob) {
+			var a = document.createElement('a');
+			a.href = URL.createObjectURL(blob);
+			a.download = t.slug + '.zip';
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+		}).catch(function (err) {
+			alert(err && err.message ? err.message + '\nCheck the "files" list for this template in templates.json.' : 'Could not create the zip.');
+		}).then(function () {
+			btn.textContent = label;
+			btn.disabled = false;
+		});
+	}
+
 	/* ---------- clipboard ---------- */
 	function copyText(text) {
 		if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
@@ -150,7 +224,7 @@
 
 	/* ---------- main panel ---------- */
 	function renderEmpty() {
-		els.main.innerHTML = '<div class="tl_empty"><h2>No templates yet</h2><p>Create a folder inside <code>templates/</code>, put your HTML file (and any images or videos) in it, then refresh this page.</p></div>';
+		els.main.innerHTML = '<div class="tl_empty"><h2>No templates yet</h2><p>Create a folder inside <code>templates/</code>, put your HTML file (and any images or videos) in it, add it to <code>templates.json</code>, then refresh this page.</p></div>';
 	}
 
 	function select(slug, push) {
@@ -169,7 +243,7 @@
 		var segs = VIEWPORTS.map(function (v) {
 			return '<button type="button" class="tl_seg__btn' + (v.key === state.viewport ? ' tl_seg__btn--on' : '') + '" data-vp="' + v.key + '">' + v.label + '</button>';
 		}).join('');
-		var files = t.files.map(function (f) { return '<li><span>' + esc(f.path) + '</span><span>' + fmtSize(f.size) + '</span></li>'; }).join('');
+		var files = t.files.map(function (f) { return '<li><span>' + esc(f) + '</span></li>'; }).join('');
 
 		els.main.innerHTML =
 			'<header class="tl_head"><div>' +
@@ -178,7 +252,7 @@
 				(tags ? '<div class="tl_head__tags">' + tags + '</div>' : '') +
 			'</div><div class="tl_actions">' +
 				'<a class="tl_btn" href="' + esc(t.url) + '" target="_blank" rel="noopener">Open preview</a>' +
-				'<a class="tl_btn tl_btn--primary" href="?download=' + encodeURIComponent(t.slug) + '">Download .zip</a>' +
+				'<button type="button" class="tl_btn tl_btn--primary" id="tl_dl">Download .zip</button>' +
 			'</div></header>' +
 
 			'<section class="tl_card"><div class="tl_card__bar"><span class="tl_card__label">Preview</span><div class="tl_seg" id="tl_seg">' + segs + '</div></div>' +
@@ -222,15 +296,15 @@
 
 	function loadCode(t) {
 		if (state.code[t.slug]) { renderCode(); return; }
-		fetch('?api=code&slug=' + encodeURIComponent(t.slug), { cache: 'no-store' })
-			.then(function (r) { if (!r.ok) throw new Error('Request failed'); return r.json(); })
-			.then(function (data) {
-				state.code[t.slug] = data.code;
+		fetch(t.url, { cache: 'no-store' })
+			.then(function (r) { if (!r.ok) throw new Error('Request failed'); return r.text(); })
+			.then(function (text) {
+				state.code[t.slug] = parseHTML(text);
 				if (state.slug === t.slug) renderCode();
 			})
 			.catch(function () {
 				var view = $('#tl_codeview');
-				if (view && state.slug === t.slug) view.textContent = 'Could not load the code for this template. Refresh the page and try again.';
+				if (view && state.slug === t.slug) view.textContent = 'Could not load the code. This page must be opened through a web server (GitHub Pages, XAMPP, VS Code Live Server), not by double-clicking the file.';
 			});
 	}
 
@@ -280,6 +354,9 @@
 		var tab = e.target.closest('[data-tab]');
 		if (tab) { state.tab = tab.getAttribute('data-tab'); renderCode(); return; }
 
+		var dl = e.target.closest('#tl_dl');
+		if (dl) { downloadZip(find(state.slug), dl); return; }
+
 		var copy = e.target.closest('#tl_copy');
 		if (copy) {
 			var code = state.code[state.slug];
@@ -305,9 +382,20 @@
 	});
 
 	/* ---------- start ---------- */
-	renderCats();
-	renderList();
-	if (!templates.length) { renderEmpty(); return; }
-	var fromHash = decodeURIComponent(location.hash.slice(1));
-	select(find(fromHash) ? fromHash : templates[0].slug, false);
+	function start() {
+		templates.sort(function (a, b) { return a.title.localeCompare(b.title); });
+		renderCats();
+		renderList();
+		if (!templates.length) { renderEmpty(); return; }
+		var fromHash = decodeURIComponent(location.hash.slice(1));
+		select(find(fromHash) ? fromHash : templates[0].slug, false);
+	}
+
+	fetch('templates.json', { cache: 'no-store' })
+		.then(function (r) { if (!r.ok) throw new Error('Request failed'); return r.json(); })
+		.then(function (data) { templates = (Array.isArray(data) ? data : []).filter(function (t) { return t && t.slug; }).map(normalize); start(); })
+		.catch(function () {
+			els.count.textContent = '';
+			els.main.innerHTML = '<div class="tl_empty"><h2>Could not load templates.json</h2><p>Open this page through a web server (GitHub Pages, XAMPP, VS Code Live Server) instead of double-clicking <code>index.html</code>, and make sure <code>templates.json</code> is valid JSON.</p></div>';
+		});
 })();

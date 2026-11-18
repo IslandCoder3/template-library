@@ -1,30 +1,31 @@
-# Template library
+# Template library (static site)
 
-Browse reusable front-end templates, preview them (desktop / tablet / mobile), copy the code, or download a whole template as a .zip.
+Plain HTML, CSS and JavaScript. No PHP, no database, no build step.
 
 ## Run it
-- Upload the folder to any PHP host (PHP 7.4+ with the zip extension), or run locally:
-  `php -S localhost:8080` inside this folder, then open http://localhost:8080
+It must be opened through a web server (browsers block reading files when you double-click index.html):
+- Local: VS Code "Live Server", XAMPP (put the folder in htdocs), or `python3 -m http.server` in this folder
+- Online: GitHub Pages, Netlify, or any normal web host. Just upload the folder.
 
 ## Add a new template
-1. Create a folder inside `templates/`, e.g. `templates/pricing-table/`
-2. Put the main HTML file inside it (`pricing-table.html` or `index.html`), with its CSS in a `<style>` block and JS in a `<script>` block.
-3. Put any images/videos next to it (`images/`, `videos/`). Use relative paths.
-4. Optional: add `meta.json`
+1. Create a folder: `templates/pricing-table/`
+2. Put the main HTML file inside (CSS in a `<style>` block, JS in a `<script>` block) plus any `images/` or `videos/`. Use relative paths.
+3. Add one entry to `templates.json`:
+
    {
+     "slug": "pricing-table",
      "title": "Pricing table",
      "category": "Sections",
      "description": "Three-column pricing with a highlighted plan.",
      "tags": ["pricing", "cards"],
-     "entry": "pricing-table.html"
+     "entry": "pricing-table.html",
+     "files": ["pricing-table.html", "images/icon.svg"]
    }
-5. Refresh the page. It appears automatically.
 
-Without `meta.json` the title comes from the HTML `<title>` and the category is "General".
+   - `slug` must match the folder name
+   - `entry` is the main HTML file
+   - `files` lists everything that goes into the downloaded .zip (paths relative to the template folder)
+4. Refresh the page.
 
-## What the tabs show
-Full file = the HTML file as-is. HTML = body markup only. CSS / JS = the inline style and script blocks, un-indented.
-`meta.json` is not included in the downloaded zip.
-
-## Note
-There is no login. If you host this publicly, anyone with the link can view and download your templates, so protect it (password, private URL or IP rule) if that matters.
+## Tabs
+Full file = the HTML file as-is. HTML = body markup only. CSS / JS = the inline style and script blocks.
