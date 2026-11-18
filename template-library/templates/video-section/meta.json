@@ -1,0 +1,7 @@
+{
+	"title": "Promo video section",
+	"category": "Video",
+	"description": "Cover image with a play button that swaps to an inline MP4 player on click. Keyboard accessible, responsive, one-line max-width control.",
+	"tags": ["video", "cover image", "play button", "mp4"],
+	"entry": "video-section.html"
+}

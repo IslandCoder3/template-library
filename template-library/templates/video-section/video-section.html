@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Promo Video Section</title>
+
+<style>
+	/* ===== Promo video section ===== */
+	.promo_vid_section{background: #fff;padding: 70px 15px;}
+
+	.promo_vid{
+		position: relative;
+		max-width: 1100px;          /* change this to make the video bigger or smaller */
+		margin: 0 auto;
+		aspect-ratio: 16 / 9;
+		border-radius: 20px;
+		overflow: hidden;
+		background: #000;
+	}
+
+	/* video is hidden until the cover is clicked */
+	.promo_vid video{display: none;width: 100%;height: 100%;}
+
+	/* cover image + play button */
+	.promo_vid_cover{position: relative;height: 100%;cursor: pointer;}
+	.promo_vid_cover img{display: block;width: 100%;height: 100%;object-fit: cover;}
+	.promo_vid_cover::before{
+		content: '';
+		position: absolute;
+		top: 50%;left: 50%;
+		width: 90px;height: 90px;
+		transform: translate(-50%, -50%);
+		border-radius: 50%;
+		background: #e2755b;        /* play button color */
+		box-shadow: 0 0 0 10px rgba(255,255,255,.35);
+		transition: transform .2s;
+	}
+	.promo_vid_cover::after{
+		content: '';
+		position: absolute;
+		top: 50%;left: 50%;
+		transform: translate(-35%, -50%);
+		border-style: solid;
+		border-width: 17px 0 17px 28px;
+		border-color: transparent transparent transparent #fff;
+	}
+	.promo_vid_cover:hover::before{transform: translate(-50%, -50%) scale(1.08);}
+	.promo_vid_cover:focus-visible{outline: 3px solid #e2755b;outline-offset: -3px;}
+
+	/* playing state */
+	.promo_vid.is-playing video{display: block;}
+	.promo_vid.is-playing .promo_vid_cover{display: none;}
+
+	@media (max-width: 1010px){
+		.promo_vid_section{padding: 40px 15px;}
+	}
+	@media (max-width: 600px){
+		.promo_vid_section{padding: 35px 12px;}
+		.promo_vid{border-radius: 12px;}
+		.promo_vid_cover::before{width: 64px;height: 64px;}
+		.promo_vid_cover::after{border-width: 12px 0 12px 20px;}
+	}
+</style>
+</head>
+
+<body>
+
+<!-- ===== Promo video section ===== -->
+<div class="promo_vid_section">
+	<div class="promo_vid">
+
+		<video preload="none" playsinline controls>
+			<source src="videos/nature-video.mp4" type="video/mp4">
+		</video>
+
+		<div class="promo_vid_cover" role="button" tabindex="0" aria-label="Play video">
+			<img src="images/nature-cover.jpg" alt="Sunrise over a calm mountain lake">
+		</div>
+
+	</div>
+</div>
+
+<script>
+(function () {
+	document.querySelectorAll('.promo_vid').forEach(function (wrap) {
+		var cover = wrap.querySelector('.promo_vid_cover');
+		var video = wrap.querySelector('video');
+		if (!cover || !video) return;
+
+		function play() {
+			wrap.classList.add('is-playing');
+			video.play();
+		}
+
+		cover.addEventListener('click', play);
+		cover.addEventListener('keydown', function (e) {
+			if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); play(); }
+		});
+	});
+})();
+</script>
+
+</body>
+</html>
